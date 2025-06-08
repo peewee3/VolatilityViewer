@@ -1,6 +1,7 @@
 from dotenv import load_dotenv
 import os
 import requests
+from parse_response import parser
 
 load_dotenv()
 
@@ -18,7 +19,7 @@ class api_provider:
 	def request_stock_history(self, ticker):
 		url = "https://yahoo-finance15.p.rapidapi.com/api/v1/markets/stock/history"
 
-		querystring = {"symbol":f"{ticker}","interval":"3mo","diffandsplits":"false"}
+		querystring = {"symbol":f"{ticker}","interval":"1d","diffandsplits":"false"}
 
 		try:
 			response = requests.get(url, headers=self.headers, params=querystring)
@@ -40,6 +41,7 @@ class api_provider:
 			body = response['body']
 			primaryData = body['primaryData']
 			price = primaryData['lastSalePrice']
+			price = float(price[1:])
 			return price
 		except requests.exceptions.RequestException as e:
 			print(f"Error fetching current stock price: {e}")
@@ -60,7 +62,22 @@ class api_provider:
 			string = str(x) + ": " + str(body[x])
 			print(string)
 
-	def get_options_for_ticker(self, ticker):
+	def get_options_for_ticker(self, ticker, expiration_date):
+
+		url = "https://yahoo-finance15.p.rapidapi.com/api/v1/markets/options"
+
+		querystring = {"ticker":f"{ticker}", "expiration":f"{expiration_date}"}
+
+		try:
+			response = requests.get(url, headers=self.headers, params=querystring)
+			response.raise_for_status()
+			response = response.json()
+			return response
+		except requests.exceptions.RequestException as e:
+			print(f"Error fetching options for ticker: {e}")
+			return None
+	
+	def get_expiry_dates(self, ticker):
 
 		url = "https://yahoo-finance15.p.rapidapi.com/api/v1/markets/options"
 
@@ -69,7 +86,13 @@ class api_provider:
 		try:
 			response = requests.get(url, headers=self.headers, params=querystring)
 			response.raise_for_status()
-			return response.json()
+			response = response.json()
+			formatted_response = parser.process_stock_data(response)
+			dates = []
+			for date in formatted_response.body[0].expirationDates:
+				dates.append(date)
+			
+			return dates
 		except requests.exceptions.RequestException as e:
 			print(f"Error fetching options for ticker: {e}")
 			return None
